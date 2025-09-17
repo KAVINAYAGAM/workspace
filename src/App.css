@@ -1,38 +1,60 @@
-.App {
+.chat-container {
+  max-width: 600px;
+  margin: auto;
+  font-family: Arial, sans-serif;
   text-align: center;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+.messages {
+  border: 1px solid #ddd;
+  padding: 10px;
+  height: 300px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  background: #f9f9f9;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.message {
+  padding: 6px 10px;
+  margin: 5px;
+  border-radius: 8px;
+  max-width: 80%;
+  word-wrap: break-word;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.message.user {
+  background: #d1e7dd;
+  text-align: right;
+  margin-left: auto;
+}
+
+.message.bot {
+  background: #f8d7da;
+  text-align: left;
+  margin-right: auto;
+}
+
+.input-container {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  gap: 5px;
 }
 
-.App-link {
-  color: #61dafb;
+.input-container input {
+  flex: 1;
+  padding: 8px;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.input-container button {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.file-preview {
+  text-align: left;
+  margin-top: 15px;
+  border: 1px solid #ccc;
+  padding: 10px;
+  background: #fff;
+  max-height: 150px;
+  overflow-y: auto;
 }
