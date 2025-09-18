@@ -1,85 +1,172 @@
-import React, { useState } from "react";
-import axios from "axios";
+import React, { useEffect, useRef, useState } from "react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { tomorrow } from "react-syntax-highlighter/dist/esm/styles/prism";
+import "./ChatBox.css";
 
-const backendUrl = "http://localhost:8000";
-
-const ChatBox = () => {
-  const [messages, setMessages] = useState([]);
+export default function ChatApp() {
+  const [messages, setMessages] = useState([
+    { text: "Hi there! 👋 How can I help you today?", from: "bot", time: "09:41" }
+  ]);
   const [input, setInput] = useState("");
-  const [fileContext, setFileContext] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  const chatEndRef = useRef(null);
+  const copyTimeoutRef = useRef(null);
+  const [copySuccess, setCopySuccess] = useState(false);
 
-  const sendMessage = async () => {
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
+
+  useEffect(() => {
+    return () => clearTimeout(copyTimeoutRef.current);
+  }, []);
+
+  const handleSend = async () => {
     if (!input.trim()) return;
 
-    setMessages((prev) => [...prev, { sender: "user", text: input }]);
-    const userMessage = input;
+    const newMessage = {
+      text: input,
+      from: "user",
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    };
+    setMessages((prev) => [...prev, newMessage]);
     setInput("");
+    setIsTyping(true);
 
     try {
-      const res = await axios.post(`${backendUrl}/api/chat`, {
-        message: userMessage,
-        context: fileContext
+      const res = await fetch("http://localhost:8000/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: "user123", message: input })
       });
-      setMessages((prev) => [...prev, { sender: "bot", text: res.data.response }]);
+
+      const data = await res.json();
+      const botReply = data.response || "⚠️ No response";
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: botReply,
+          from: "bot",
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        }
+      ]);
     } catch (err) {
-      setMessages((prev) => [...prev, { sender: "bot", text: "Error: Could not fetch response" }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: "⚠️ Error connecting to server.",
+          from: "bot",
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        }
+      ]);
+    } finally {
+      setIsTyping(false);
     }
   };
 
-  const handleUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
+  const copyToClipboard = (code) => {
+    navigator.clipboard.writeText(code);
+    setCopySuccess(true);
+    clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = setTimeout(() => setCopySuccess(false), 2000);
+  };
 
-    try {
-      const res = await axios.post(`${backendUrl}/api/upload`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setFileContext(res.data.text || "");
-      alert("File uploaded and text extracted!");
-    } catch (err) {
-      alert("Error uploading file");
+  const renderMessage = (msg, index) => {
+    const codeRegex = /``````/g;
+    const parts = msg.text.split(codeRegex);
+
+    const avatar = msg.from === "bot" ? "🤖" : "🙂";
+
+    if (parts.length === 1) {
+      return (
+        <div className="message-bubble" key={index}>
+          <div className="avatar">{avatar}</div>
+          <div className="text-content">{msg.text}</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="message-bubble code-support" key={index}>
+        <div className="avatar">{avatar}</div>
+        <div className="text-content">
+          {parts.map((part, i) =>
+            i % 2 === 1 ? (
+              <div key={i} className="code-block">
+                <SyntaxHighlighter language="javascript" style={tomorrow} showLineNumbers>
+                  {part.trim()}
+                </SyntaxHighlighter>
+                <button
+                  className="copy-btn"
+                  onClick={() => copyToClipboard(part.trim())}
+                  title="Copy code"
+                  aria-label="Copy code to clipboard"
+                >
+                  📋
+                </button>
+              </div>
+            ) : (
+              part && <p key={i}>{part}</p>
+            )
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const handleInputKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
   };
 
   return (
-    <div style={{ maxWidth: "600px", margin: "0 auto", padding: "1rem" }}>
-      <h2>Perplexity Chatbot</h2>
-
-      <input type="file" onChange={handleUpload} style={{ marginBottom: "1rem" }} />
-
-      <div style={{ height: "400px", overflowY: "auto", border: "1px solid #ccc", padding: "0.5rem" }}>
-        {messages.map((msg, idx) => (
-          <div key={idx} style={{ textAlign: msg.sender === "user" ? "right" : "left", margin: "0.5rem 0" }}>
-            <span
-              style={{
-                display: "inline-block",
-                padding: "0.5rem 1rem",
-                borderRadius: "1rem",
-                background: msg.sender === "user" ? "#DCF8C6" : "#ECECEC",
-              }}
-            >
-              {msg.text}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ marginTop: "1rem" }}>
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-          style={{ width: "80%", padding: "0.5rem" }}
-        />
-        <button onClick={sendMessage} style={{ padding: "0.5rem 1rem", marginLeft: "0.5rem" }}>
-          Send
+    <div className={`chat-container ${darkMode ? "dark-mode" : ""}`}>
+      <div className="chat-header">
+        💬 Perplexity Chatbot
+        <button
+          className="dark-mode-toggle"
+          onClick={() => setDarkMode(!darkMode)}
+          aria-label="Toggle dark mode"
+          title="Toggle Dark Mode"
+        >
+          {darkMode ? "🌞" : "🌙"}
         </button>
       </div>
+      <div className="chat-body" role="log" aria-live="polite">
+        {messages.map((msg, i) => (
+          <div key={i} className={`chat-message ${msg.from}`}>
+            {renderMessage(msg, i)}
+            <div className="message-time" title={`Sent at ${msg.time}`}>
+              {msg.time}
+            </div>
+          </div>
+        ))}
+        {isTyping && (
+          <div className="chat-message bot">
+            <div className="message-bubble typing">🤖 Bot is typing...</div>
+          </div>
+        )}
+        <div ref={chatEndRef} />
+      </div>
+      <div className="chat-footer">
+        <textarea
+          rows={1}
+          placeholder="Type a message..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleInputKeyDown}
+          className="message-input"
+          aria-label="Chat message input"
+        />
+        <button onClick={handleSend} aria-label="Send message">
+          ➤
+        </button>
+      </div>
+      {copySuccess && <div className="copy-toast">✅ Code copied!</div>}
     </div>
   );
-};
-
-export default ChatBox;
+}
